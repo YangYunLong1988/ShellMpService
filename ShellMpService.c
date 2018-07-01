@@ -22,6 +22,31 @@ EFI_MP_SERVICES_PROTOCOL         *mMpService;
 extern EFI_SYSTEM_TABLE   *gST;
 extern EFI_BOOT_SERVICES  *gBS;
 CHAR16                          HexDigit[17] = L"0123456789ABCDEF";
+UINTN 								gTestInfo=0x21;
+
+VOID
+EFIAPI
+ClientTask (
+  IN OUT VOID *Buffer
+  )
+{
+  EFI_STATUS                          Status;
+  UINTN 				              MyCpuNumber;
+  //
+  // Get current running CPU number
+  //
+  Status = mMpService->WhoAmI (
+                        mMpService,
+                        &MyCpuNumber
+                        );
+  Print(L"The current running CPU number is: %x\n", MyCpuNumber);
+  ASSERT_EFI_ERROR (Status);
+  
+  (*((UINTN *)Buffer))++;
+  Print(L"current TestInfo is: %x\n", *((UINTN *)Buffer));
+  
+}
+
 
 VOID
 HexToString (
@@ -99,7 +124,10 @@ UefiMain (
   UINTN 				              Index;
   UINTN 				              NumProc;
   UINTN 				              NumEnabled;
+  UINTN 				              MyCpuNumber;
   EFI_PROCESSOR_INFORMATION           MpContext;
+  
+  UINTN 								TestInfo=0x11;
 
   
   Print(L"UefiMain - MP service");
@@ -116,6 +144,16 @@ UefiMain (
   if (EFI_ERROR(Status)) {
 	Print(L"Unable to locate the MpService procotol: %r\n", Status);
   }  
+
+  //
+  // Get current running CPU number
+  //
+  Status = mMpService->WhoAmI (
+                        mMpService,
+                        &MyCpuNumber
+                        );
+  Print(L"BSP: %x\n", MyCpuNumber);
+  ASSERT_EFI_ERROR (Status);
   
   // Get Number of Processors and Number of Enabled Processors
   Status = mMpService->GetNumberOfProcessors( mMpService, &NumProc, &NumEnabled);
@@ -132,6 +170,7 @@ UefiMain (
   if (MpContext.ProcessorId > 255) {
     break;
   }
+  Print(L"MpContext.ProcessorId: %x\n", MpContext.ProcessorId);
   if (((MpContext.StatusFlag | PROCESSOR_HEALTH_STATUS_BIT) == 1) || ((MpContext.StatusFlag | PROCESSOR_HEALTH_STATUS_BIT) == 0)) {
     DEBUG ((DEBUG_ERROR, "BIST FAILED CORE=%x THREAD=%x EAX=%x\n", (UINT32)MpContext.Location.Core, (UINT32)MpContext.Location.Thread, MpContext.StatusFlag));
     DisplaySelfTestBistResult(
@@ -140,6 +179,28 @@ UefiMain (
                  MpContext.StatusFlag
                  );
   }
+  
+  Print(L"Begain local variable test: \n"); 
+  mMpService->StartupThisAP (
+                mMpService,
+                ClientTask,
+                Index,
+                NULL,
+                0,
+                &TestInfo,
+                NULL
+                );
+  Print(L"Begain global variable test: \n"); 
+  mMpService->StartupThisAP (
+                mMpService,
+                ClientTask,
+                Index,
+                NULL,
+                0,
+                &gTestInfo,
+                NULL
+                );					
+					
 }
   return EFI_SUCCESS;
 }
