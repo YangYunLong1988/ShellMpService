@@ -26,7 +26,7 @@ UINTN 								gTestInfo=0x21;
 
 VOID
 EFIAPI
-ClientTask (
+LClientTask (
   IN OUT VOID *Buffer
   )
 {
@@ -43,10 +43,31 @@ ClientTask (
   ASSERT_EFI_ERROR (Status);
   
   (*((UINTN *)Buffer))++;
-  Print(L"current TestInfo is: %x\n", *((UINTN *)Buffer));
-  
+  Print(L"current TestlocalVariable is: %x\n", *((UINTN *)Buffer));
 }
 
+
+VOID
+EFIAPI
+GClientTask (
+  IN OUT VOID *Buffer
+  )
+{
+  EFI_STATUS                          Status;
+  UINTN 				              MyCpuNumber;
+  //
+  // Get current running CPU number
+  //
+  Status = mMpService->WhoAmI (
+                        mMpService,
+                        &MyCpuNumber
+                        );
+  Print(L"The current running CPU number is: %x\n", MyCpuNumber);
+  ASSERT_EFI_ERROR (Status);
+  
+  (*((UINTN *)Buffer))++;
+  Print(L"current TestGlobalVariable is: %x\n", *((UINTN *)Buffer));
+}
 
 VOID
 HexToString (
@@ -130,7 +151,7 @@ UefiMain (
   UINTN 								TestInfo=0x11;
 
   
-  Print(L"UefiMain - MP service");
+  Print(L"UefiMain - MP service Check\n");
   
   //
   // Locate MP service protocol
@@ -161,10 +182,10 @@ UefiMain (
 	Print(L"Unable to get the number of processors: %r\n", Status);
   }else{
 	Print(L"NumberOfProcessors: %x\n", NumProc);
-	Print(L"NumberOfEnabledProcessors: %x\n", NumEnabled);  
+	Print(L"NumberOfEnabledProcessors: %x\n \n", NumEnabled);  
   }
   
-  for (Index = 0; Index < NumProc; Index++) {
+  for (Index = 0; Index < (NumProc-1); Index++) {
   Status = mMpService->GetProcessorInfo (mMpService, Index, &MpContext);
   ASSERT_EFI_ERROR (Status);
   if (MpContext.ProcessorId > 255) {
@@ -183,23 +204,26 @@ UefiMain (
   Print(L"Begain local variable test: \n"); 
   mMpService->StartupThisAP (
                 mMpService,
-                ClientTask,
-                Index,
+                LClientTask,
+                (Index+1),
                 NULL,
                 0,
                 &TestInfo,
                 NULL
                 );
+				
+				
   Print(L"Begain global variable test: \n"); 
   mMpService->StartupThisAP (
                 mMpService,
-                ClientTask,
-                Index,
+                GClientTask,
+                (Index+1),
                 NULL,
                 0,
                 &gTestInfo,
                 NULL
-                );					
+                );		
+  Print(L"\n \n");				
 					
 }
   return EFI_SUCCESS;
